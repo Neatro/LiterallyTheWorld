@@ -1,0 +1,11 @@
+{
+	"title"		:	"Literally, the world",
+	"type"		:	"entity",
+	"tags"		:	[ "fun", "scenic" ],
+	"ignore"	:
+	[
+		"*.psd",
+		"*.vcproj",
+		"*.svn*"
+	]
+}
