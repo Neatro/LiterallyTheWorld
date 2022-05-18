@@ -37,7 +37,7 @@ function util.TraceLine( td )
 end
 
 function ENT:Initialize( )
-	if #ents.FindByClass( "literallytheworld" ) > 1 then
+	if #ents.FindByClass( "literallytheworld*" ) > 1 then
 		self:Remove()
 	end
 	

@@ -44,7 +44,7 @@ end
 OldTraceFunction = OldTraceFunction or util.TraceLine
 
 RedirectionEntities = {}
-
+--[[ --will fix trace detour sooner or later
 function util.TraceLine( td )
 	local tr = OldTraceFunction( td )
 	if tr == nil then return end
@@ -70,7 +70,7 @@ function util.TraceLine( td )
 		return tr
 	end
 end
-
+]]--
 function ENT:Initialize()
 
 	RedirectionEntities[ self:EntIndex() ] = self
@@ -121,6 +121,14 @@ function ENT:Initialize()
 			return view
 		end
 	end )
+	
+	--fog fix
+	hook.Add( "SetupWorldFog", "WorldDrawFogAdjust", function( ply, pos, angles, fov )
+		if self.dontDrawSky then
+			render.FogMode( MATERIAL_FOG_NONE )
+			return true
+		end
+	end )
 
 	local currentEntity = Entity( entindex )
 	hook.Add( "RenderScene", "WorldRenderThing", function( pos, ang, fov )
@@ -146,14 +154,17 @@ function ENT:Initialize()
 				render.SetStencilPassOperation( STENCIL_REPLACE )
 				render.SetStencilFailOperation( STENCIL_KEEP )
 				
+				local offset = ( eyepos / self.Scale - currentEntity:GetPos() / self.Scale )
+				offset = currentEntity:WorldToLocal( offset )
+				local offset2 = currentEntity:WorldToLocal( Vector() )
+				
+				--halo fix
+				local oldHaloFunction = halo.Add
+				halo.Add = function() end
+
+				--sky
 				self.dontDrawSky = true
 				
-				local offset = ( eyepos / self.Scale - currentEntity:GetPos() / self.Scale )
-
-				offset = currentEntity:WorldToLocal( offset )
-				
-				local offset2 = currentEntity:WorldToLocal( Vector() )
-
 				render.OverrideDepthEnable( true, true )
 				render.RenderView( {
 					origin = offset - offset2, 
@@ -167,8 +178,12 @@ function ENT:Initialize()
 					fov = fov
 				} )
 				render.OverrideDepthEnable( false, false )
-
+				
+				--sky end
 				self.dontDrawSky = false
+
+				--halo fix end
+				halo.Add = oldHaloFunction
 				
 				--draw world
 				render.SetStencilCompareFunction( STENCIL_EQUAL )
@@ -204,6 +219,15 @@ end
 local drawingEnt
 
 function ENT:Draw()
+	
+	if halo.RenderedEntity() == self then 
+		render.SetColorMaterial()
+		render.DrawBox( self:GetPos(), self:GetAngles(), self.MBounds, self.Bounds, Color( 127, 127, 191 ) )
+		
+		return 
+	end
+	
+	--dont draw itself tiny, otherwise ded
 	if drawingEnt or drawingWorld then 
 		render.SetColorMaterial()
 		render.DrawBox( self:GetPos(), self:GetAngles(), self.MBounds, self.Bounds, Color( 127, 127, 191 ) )
@@ -212,28 +236,22 @@ function ENT:Draw()
 	end
 	
 	if WorldRenderMaterial then
-		drawingEnt = true
+		
+		render.SetStencilEnable( true )
 		
 		resetstencil()
 		
-		render.SetStencilWriteMask( 0xFF  )
-		render.SetStencilTestMask( 0xFF  )
-		render.SetStencilReferenceValue( 0 )
+		render.ClearStencil()
+		render.SetStencilWriteMask( 0x1  )
+		render.SetStencilTestMask( 0x1  )
+		render.SetStencilReferenceValue( 1 )
 		render.SetStencilCompareFunction( STENCIL_ALWAYS )
 		render.SetStencilPassOperation( STENCIL_REPLACE )
 		render.SetStencilFailOperation( STENCIL_KEEP )
 		render.SetStencilZFailOperation( STENCIL_KEEP )
-		
-		render.SetStencilEnable( true )
-		
-		--only draw when visible
-		render.SetStencilReferenceValue( 1 )
-		render.SetStencilFailOperation( STENCIL_REPLACE )
-		render.SetStencilZFailOperation( STENCIL_ZERO )
-		render.SetStencilCompareFunction( STENCIL_ALWAYS )
-		
+
 		--draw box
-		render.SetMaterial( CubeMaterial )
+		render.SetMaterial( CubeMaterial ) --Material( "phoenix_storms/glass" )
 		render.OverrideDepthEnable( false, false )
 		render.DrawBox( self:GetPos(), self:GetAngles(), self.Bounds, self.MBounds )
 		render.DrawBox( self:GetPos(), self:GetAngles(), self.MBounds, self.Bounds )
@@ -247,7 +265,6 @@ function ENT:Draw()
 	
 		render.SetStencilEnable( false )
 		
-		drawingEnt = false
 	end
 
 	debugoverlay.BoxAngles( self:GetPos(), self.MBounds, self.Bounds, self:GetAngles(), 0.05, Color( 255, 255, 0, 1 ) )
